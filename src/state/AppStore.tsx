@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as api from '../data/api';
+import { getErrorMessage } from '../data/errors';
 import { activityOptions } from '../data/options';
 import { AlertItem, Circle, UpToChatStatus } from '../data/types';
 import { supabase } from '../lib/supabase';
@@ -73,7 +74,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         setInitials(profile.first_name.charAt(0).toUpperCase());
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load profile');
+      setError(getErrorMessage(e, 'Failed to load profile'));
     }
   }, [userId]);
 
@@ -84,7 +85,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       const data = await api.fetchCircles(userId);
       setCircles(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load circles');
+      setError(getErrorMessage(e, 'Failed to load circles'));
     } finally {
       setIsLoadingCircles(false);
     }
@@ -97,7 +98,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       const data = await api.fetchAlerts(userId);
       setAlerts(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load alerts');
+      setError(getErrorMessage(e, 'Failed to load alerts'));
     } finally {
       setIsLoadingAlerts(false);
     }
@@ -121,7 +122,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         setStatus({ isActive: false, activity: null, durationMinutes: null, startedAt: null, circleIds: [] });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load status');
+      setError(getErrorMessage(e, 'Failed to load status'));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
@@ -164,7 +165,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       });
       await refreshCircles();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to go up to chat');
+      setError(getErrorMessage(e, 'Failed to go up to chat'));
     }
   }, [userId, selectedActivityId, selectedDurationMinutes, selectedCircleIds, refreshCircles]);
 
@@ -177,7 +178,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       setStatus({ isActive: false, activity: null, durationMinutes: null, startedAt: null, circleIds: [] });
       await refreshCircles();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to cancel');
+      setError(getErrorMessage(e, 'Failed to cancel'));
     }
   }, [activeStatusId, refreshCircles]);
 
@@ -188,7 +189,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       try {
         await api.dismissAlert(userId, alertId);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to dismiss alert');
+        setError(getErrorMessage(e, 'Failed to dismiss alert'));
       }
     },
     [userId]
@@ -203,7 +204,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         const circle = await api.createCircle(userId, trimmed);
         setCircles((prev) => [...prev, circle]);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to create circle');
+        setError(getErrorMessage(e, 'Failed to create circle'));
       }
     },
     [userId]
