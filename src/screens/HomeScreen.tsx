@@ -1,0 +1,240 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Avatar } from '../components/Avatar';
+import { Chip } from '../components/Chip';
+import { activityOptions, durationOptions } from '../data/mockData';
+import { useAppStore } from '../state/AppStore';
+import { colors, radii, spacing, typography } from '../theme/theme';
+
+function greetingForHour(hour: number) {
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function formatCountdown(ms: number) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+export function HomeScreen() {
+  const {
+    user,
+    circles,
+    status,
+    selectedDurationMinutes,
+    selectedActivityId,
+    selectedCircleIds,
+    toggleCircleSelected,
+    setSelectedDuration,
+    setSelectedActivity,
+    goUpToChat,
+    cancelUpToChat,
+  } = useAppStore();
+
+  const [now, setNow] = useState(Date.now());
+  const greeting = useMemo(() => greetingForHour(new Date().getHours()), []);
+
+  useEffect(() => {
+    if (!status.isActive) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [status.isActive]);
+
+  const remainingMs =
+    status.isActive && status.startedAt && status.durationMinutes
+      ? status.startedAt + status.durationMinutes * 60 * 1000 - now
+      : 0;
+
+  const hasExpired = status.isActive && remainingMs <= 0;
+
+  useEffect(() => {
+    if (hasExpired) cancelUpToChat();
+  }, [hasExpired, cancelUpToChat]);
+
+  const canGoActive = selectedCircleIds.length > 0;
+
+  return (
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={typography.display}>
+            {greeting},
+          </Text>
+          <Text style={[typography.display, styles.accentName]}>{user.firstName}.</Text>
+        </View>
+        <Avatar initials={user.initials} colorIndex={0} size={48} />
+      </View>
+
+      <Pressable
+        onPress={status.isActive ? cancelUpToChat : canGoActive ? goUpToChat : undefined}
+        style={({ pressed }) => [
+          styles.toggleCard,
+          status.isActive ? styles.toggleCardActive : styles.toggleCardIdle,
+          pressed && styles.pressed,
+          !status.isActive && !canGoActive && styles.toggleCardDisabled,
+        ]}
+      >
+        <View style={[styles.toggleDot, status.isActive ? styles.toggleDotActive : styles.toggleDotIdle]}>
+          <View style={status.isActive ? styles.toggleDotInnerActive : styles.toggleDotInnerIdle} />
+        </View>
+        <Text style={[styles.toggleTitle, status.isActive && styles.toggleTitleActive]}>
+          {status.isActive ? "I'm up to chat" : "I'm up to chat"}
+        </Text>
+        <Text style={[styles.toggleSubtitle, status.isActive && styles.toggleSubtitleActive]}>
+          {status.isActive
+            ? `Ends in ${formatCountdown(remainingMs)} · tap to cancel`
+            : canGoActive
+            ? 'Tap to let your people know'
+            : 'Pick a circle below first'}
+        </Text>
+      </Pressable>
+
+      <View style={styles.section}>
+        <Text style={typography.label}>FOR HOW LONG?</Text>
+        <View style={styles.chipRow}>
+          {durationOptions.map((option) => (
+            <Chip
+              key={option.label}
+              label={option.label}
+              selected={
+                option.minutes === 0
+                  ? ![15, 30, 60].includes(selectedDurationMinutes)
+                  : selectedDurationMinutes === option.minutes
+              }
+              onPress={() => setSelectedDuration(option.minutes === 0 ? 45 : option.minutes)}
+            />
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={typography.label}>WHAT ARE YOU UP TO?</Text>
+        <View style={styles.chipRow}>
+          {activityOptions.map((option) => (
+            <Chip
+              key={option.id}
+              label={option.label}
+              selected={selectedActivityId === option.id}
+              onPress={() => setSelectedActivity(option.id)}
+            />
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={typography.label}>WHO SHOULD KNOW?</Text>
+        <View style={styles.chipRow}>
+          {circles.map((circle) => (
+            <Chip
+              key={circle.id}
+              label={circle.name}
+              selected={selectedCircleIds.includes(circle.id)}
+              onPress={() => toggleCircleSelected(circle.id)}
+            />
+          ))}
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  content: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.lg,
+  },
+  accentName: {
+    color: colors.accent,
+  },
+  toggleCard: {
+    borderRadius: radii.lg,
+    padding: spacing.xl,
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+  },
+  toggleCardIdle: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+  },
+  toggleCardActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  toggleCardDisabled: {
+    opacity: 0.6,
+  },
+  pressed: {
+    opacity: 0.85,
+  },
+  toggleDot: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  toggleDotIdle: {
+    borderWidth: 2,
+    borderColor: colors.textMuted,
+  },
+  toggleDotActive: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  toggleDotInnerIdle: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.textMuted,
+  },
+  toggleDotInnerActive: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#0A0D0B',
+  },
+  toggleTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  toggleTitleActive: {
+    color: '#0A0D0B',
+  },
+  toggleSubtitle: {
+    marginTop: spacing.xs,
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  toggleSubtitleActive: {
+    color: 'rgba(10,13,11,0.7)',
+  },
+  section: {
+    marginBottom: spacing.lg,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+});
