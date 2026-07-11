@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../components/Avatar';
 import { Chip } from '../components/Chip';
-import { activityOptions, durationOptions } from '../data/mockData';
+import { activityOptions, durationOptions } from '../data/options';
 import { useAppStore } from '../state/AppStore';
+import { useAuth } from '../state/AuthContext';
 import { colors, radii, spacing, typography } from '../theme/theme';
 
 function greetingForHour(hour: number) {
@@ -21,7 +22,8 @@ function formatCountdown(ms: number) {
 
 export function HomeScreen() {
   const {
-    user,
+    firstName,
+    initials,
     circles,
     status,
     selectedDurationMinutes,
@@ -33,9 +35,17 @@ export function HomeScreen() {
     goUpToChat,
     cancelUpToChat,
   } = useAppStore();
+  const { signOut } = useAuth();
 
   const [now, setNow] = useState(Date.now());
   const greeting = useMemo(() => greetingForHour(new Date().getHours()), []);
+
+  useEffect(() => {
+    if (circles.length > 0 && selectedCircleIds.length === 0) {
+      toggleCircleSelected(circles[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [circles]);
 
   useEffect(() => {
     if (!status.isActive) return;
@@ -67,9 +77,18 @@ export function HomeScreen() {
           <Text style={typography.display}>
             {greeting},
           </Text>
-          <Text style={[typography.display, styles.accentName]}>{user.firstName}.</Text>
+          <Text style={[typography.display, styles.accentName]}>{firstName || 'there'}.</Text>
         </View>
-        <Avatar initials={user.initials} colorIndex={0} size={48} />
+        <Pressable
+          onPress={() =>
+            Alert.alert('Sign out?', undefined, [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Sign out', style: 'destructive', onPress: signOut },
+            ])
+          }
+        >
+          <Avatar initials={initials || '?'} colorIndex={0} size={48} />
+        </Pressable>
       </View>
 
       <Pressable

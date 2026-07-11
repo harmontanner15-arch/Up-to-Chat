@@ -3,6 +3,8 @@ import { DarkTheme, NavigationContainer, Theme } from '@react-navigation/native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
 import { View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ErrorBanner } from '../components/ErrorBanner';
 import { AlertsScreen } from '../screens/AlertsScreen';
 import { CirclesScreen } from '../screens/CirclesScreen';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -44,6 +46,9 @@ function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
 export function RootNavigator() {
   return (
     <NavigationContainer theme={navTheme}>
+      <SafeAreaView edges={['top']} style={{ backgroundColor: colors.background }}>
+        <ErrorBanner />
+      </SafeAreaView>
       <Tab.Navigator
         screenOptions={{
           headerShown: false,

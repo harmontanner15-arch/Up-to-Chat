@@ -46,9 +46,12 @@ export function CirclesScreen() {
   const { circles, createCircle } = useAppStore();
   const [modalVisible, setModalVisible] = useState(false);
   const [name, setName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
-  const handleCreate = () => {
-    createCircle({ name });
+  const handleCreate = async () => {
+    setIsCreating(true);
+    await createCircle({ name });
+    setIsCreating(false);
     setName('');
     setModalVisible(false);
   };
@@ -92,11 +95,15 @@ export function CirclesScreen() {
                 <Text style={styles.modalButtonGhostText}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={[styles.modalButton, styles.modalButtonPrimary, !name.trim() && styles.modalButtonDisabled]}
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonPrimary,
+                  (!name.trim() || isCreating) && styles.modalButtonDisabled,
+                ]}
                 onPress={handleCreate}
-                disabled={!name.trim()}
+                disabled={!name.trim() || isCreating}
               >
-                <Text style={styles.modalButtonPrimaryText}>Create</Text>
+                <Text style={styles.modalButtonPrimaryText}>{isCreating ? 'Creating…' : 'Create'}</Text>
               </Pressable>
             </View>
           </View>

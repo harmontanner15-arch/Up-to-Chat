@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../components/Avatar';
 import { Card } from '../components/Card';
-import { useAppStore } from '../state/AppStore';
 import { AlertItem } from '../data/types';
+import { useAppStore } from '../state/AppStore';
 import { colors, radii, spacing, typography } from '../theme/theme';
 
 function HistoryRow({ item }: { item: AlertItem }) {
@@ -21,69 +21,64 @@ function HistoryRow({ item }: { item: AlertItem }) {
   );
 }
 
-export function AlertsScreen() {
-  const { user, status, alerts, cancelUpToChat } = useAppStore();
+function LiveRow({ item, onDismiss }: { item: AlertItem; onDismiss: () => void }) {
+  return (
+    <Card style={styles.liveCard}>
+      <View style={styles.liveHeader}>
+        <Avatar initials={item.member.initials} colorIndex={item.member.colorIndex} size={44} />
+        <View style={styles.liveHeaderText}>
+          <View style={styles.liveNameRow}>
+            <Text style={styles.liveName}>{item.name}</Text>
+            <View style={styles.liveDot} />
+          </View>
+          <Text style={styles.liveMeta}>Up to chat · {item.activity}</Text>
+        </View>
+        <Text style={styles.liveTime}>{item.timeLabel}</Text>
+      </View>
+      <Text style={styles.liveQuote}>
+        &quot;{item.name} is free for a chat — grab them before they disappear.&quot;
+      </Text>
+      <View style={styles.liveActions}>
+        <Pressable style={styles.callButton}>
+          <Text style={styles.callButtonText}>Call now</Text>
+        </Pressable>
+        <Pressable style={styles.dismissButton} onPress={onDismiss}>
+          <Text style={styles.dismissButtonText}>×</Text>
+        </Pressable>
+      </View>
+    </Card>
+  );
+}
 
-  const liveItem: AlertItem | null = status.isActive
-    ? {
-        id: 'live-self',
-        member: { id: 'me', initials: user.initials, colorIndex: 0 },
-        name: user.firstName,
-        isLive: true,
-        activity: status.activity ?? 'Free time',
-        timeLabel: 'now',
-        relativeTime: 'now',
-        quote: `${user.firstName} is free for a chat — grab them before they disappear.`,
-      }
-    : null;
+export function AlertsScreen() {
+  const { alerts, isLoadingAlerts, dismissAlert } = useAppStore();
+
+  const liveAlerts = useMemo(() => alerts.filter((a) => a.isLive), [alerts]);
+  const historyAlerts = useMemo(() => alerts.filter((a) => !a.isLive), [alerts]);
 
   return (
     <View style={styles.screen}>
       <FlatList
-        data={alerts}
+        data={historyAlerts}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
             <Text style={[typography.display, styles.heading]}>Alerts</Text>
-            {liveItem && (
-              <Card style={styles.liveCard}>
-                <View style={styles.liveHeader}>
-                  <Avatar initials={liveItem.member.initials} colorIndex={liveItem.member.colorIndex} size={44} />
-                  <View style={styles.liveHeaderText}>
-                    <View style={styles.liveNameRow}>
-                      <Text style={styles.liveName}>{liveItem.name}</Text>
-                      <View style={styles.liveDot} />
-                    </View>
-                    <Text style={styles.liveMeta}>
-                      Up to chat · {status.durationMinutes}m · {liveItem.activity}
-                    </Text>
-                  </View>
-                  <Text style={styles.liveTime}>{liveItem.timeLabel}</Text>
-                </View>
-                <Text style={styles.liveQuote}>&quot;{liveItem.quote}&quot;</Text>
-                <View style={styles.liveActions}>
-                  <Pressable style={styles.callButton}>
-                    <Text style={styles.callButtonText}>Call now</Text>
-                  </Pressable>
-                  <Pressable style={styles.dismissButton} onPress={cancelUpToChat}>
-                    <Text style={styles.dismissButtonText}>×</Text>
-                  </Pressable>
-                </View>
-              </Card>
-            )}
+            {liveAlerts.map((item) => (
+              <LiveRow key={item.id} item={item} onDismiss={() => dismissAlert(item.id)} />
+            ))}
           </>
         }
-        renderItem={({ item }) => (
-          <HistoryRow item={item} />
-        )}
+        renderItem={({ item }) => <HistoryRow item={item} />}
         ListEmptyComponent={
-          !liveItem ? (
-            <Text style={styles.emptyText}>No alerts yet. When your circles are up to chat, they will show up here.</Text>
+          !isLoadingAlerts && liveAlerts.length === 0 ? (
+            <Text style={styles.emptyText}>
+              No alerts yet. When your circles are up to chat, they will show up here.
+            </Text>
           ) : null
         }
-        onEndReachedThreshold={0.5}
       />
     </View>
   );
