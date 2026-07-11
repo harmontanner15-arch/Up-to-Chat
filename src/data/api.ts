@@ -245,3 +245,26 @@ export async function dismissAlert(userId: string, statusId: string): Promise<vo
   const { error } = await supabase.from('alert_dismissals').insert({ user_id: userId, status_id: statusId });
   if (error) throw error;
 }
+
+export async function inviteToCircle(circleId: string, email: string): Promise<Member> {
+  const { data: matches, error: lookupErr } = await supabase.rpc('find_profile_by_email', {
+    p_email: email.trim(),
+  });
+  if (lookupErr) throw lookupErr;
+  const profile = (matches ?? [])[0] as ProfileRow | undefined;
+  if (!profile) {
+    throw new Error('No Up to Chat account found for that email.');
+  }
+
+  const { error: memberErr } = await supabase
+    .from('circle_members')
+    .insert({ circle_id: circleId, user_id: profile.id, role: 'member' });
+  if (memberErr) {
+    if (memberErr.code === '23505') {
+      throw new Error('That person is already in this circle.');
+    }
+    throw memberErr;
+  }
+
+  return toMember(profile);
+}

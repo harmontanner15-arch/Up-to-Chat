@@ -31,6 +31,7 @@ type AppState = {
   cancelUpToChat: () => Promise<void>;
   dismissAlert: (alertId: string) => Promise<void>;
   createCircle: (input: NewCircleInput) => Promise<void>;
+  inviteToCircle: (circleId: string, email: string) => Promise<{ error: string | null }>;
 };
 
 const AppStoreContext = createContext<AppState | null>(null);
@@ -210,6 +211,22 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     [userId]
   );
 
+  const inviteToCircle = useCallback(async (circleId: string, email: string): Promise<{ error: string | null }> => {
+    try {
+      const member = await api.inviteToCircle(circleId, email);
+      setCircles((prev) =>
+        prev.map((circle) =>
+          circle.id === circleId
+            ? { ...circle, memberCount: circle.memberCount + 1, members: [...circle.members, member] }
+            : circle
+        )
+      );
+      return { error: null };
+    } catch (e) {
+      return { error: getErrorMessage(e, 'Failed to invite') };
+    }
+  }, []);
+
   const value = useMemo<AppState>(
     () => ({
       userId,
@@ -232,6 +249,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       cancelUpToChat,
       dismissAlert,
       createCircle,
+      inviteToCircle,
     }),
     [
       userId,
@@ -251,6 +269,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       cancelUpToChat,
       dismissAlert,
       createCircle,
+      inviteToCircle,
     ]
   );
 

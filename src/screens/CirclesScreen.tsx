@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Avatar, AvatarOverflow } from '../components/Avatar';
 import { Card } from '../components/Card';
-import { useAppStore } from '../state/AppStore';
 import { Circle } from '../data/types';
+import { useAppStore } from '../state/AppStore';
 import { colors, radii, spacing, typography } from '../theme/theme';
 
 const VISIBLE_AVATARS = 3;
 
-function CircleRow({ circle }: { circle: Circle }) {
+function CircleRow({ circle, onInvite }: { circle: Circle; onInvite: () => void }) {
   const overflow = circle.memberCount - VISIBLE_AVATARS;
   return (
     <Card style={styles.circleCard}>
@@ -26,27 +26,37 @@ function CircleRow({ circle }: { circle: Circle }) {
           <Text style={styles.quietText}>all quiet</Text>
         )}
       </View>
-      <View style={styles.avatarRow}>
-        {circle.members.slice(0, VISIBLE_AVATARS).map((m, idx) => (
-          <Avatar
-            key={m.id}
-            initials={m.initials}
-            colorIndex={m.colorIndex}
-            size={40}
-            style={idx > 0 ? styles.avatarOverlap : undefined}
-          />
-        ))}
-        {overflow > 0 && <AvatarOverflow count={overflow} size={40} style={styles.avatarOverlap} />}
+      <View style={styles.circleFooter}>
+        <View style={styles.avatarRow}>
+          {circle.members.slice(0, VISIBLE_AVATARS).map((m, idx) => (
+            <Avatar
+              key={m.id}
+              initials={m.initials}
+              colorIndex={m.colorIndex}
+              size={40}
+              style={idx > 0 ? styles.avatarOverlap : undefined}
+            />
+          ))}
+          {overflow > 0 && <AvatarOverflow count={overflow} size={40} style={styles.avatarOverlap} />}
+        </View>
+        <Pressable onPress={onInvite} style={styles.inviteButton}>
+          <Text style={styles.inviteButtonText}>+ invite</Text>
+        </Pressable>
       </View>
     </Card>
   );
 }
 
 export function CirclesScreen() {
-  const { circles, createCircle } = useAppStore();
+  const { circles, createCircle, inviteToCircle } = useAppStore();
   const [modalVisible, setModalVisible] = useState(false);
   const [name, setName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+
+  const [inviteCircle, setInviteCircle] = useState<Circle | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [isInviting, setIsInviting] = useState(false);
 
   const handleCreate = async () => {
     setIsCreating(true);
@@ -56,6 +66,25 @@ export function CirclesScreen() {
     setModalVisible(false);
   };
 
+  const closeInviteModal = () => {
+    setInviteCircle(null);
+    setInviteEmail('');
+    setInviteError(null);
+  };
+
+  const handleInvite = async () => {
+    if (!inviteCircle) return;
+    setIsInviting(true);
+    setInviteError(null);
+    const { error } = await inviteToCircle(inviteCircle.id, inviteEmail);
+    setIsInviting(false);
+    if (error) {
+      setInviteError(error);
+      return;
+    }
+    closeInviteModal();
+  };
+
   return (
     <View style={styles.screen}>
       <FlatList
@@ -63,7 +92,7 @@ export function CirclesScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
         ListHeaderComponent={<Text style={[typography.display, styles.heading]}>My circles</Text>}
-        renderItem={({ item }) => <CircleRow circle={item} />}
+        renderItem={({ item }) => <CircleRow circle={item} onInvite={() => setInviteCircle(item)} />}
         ListFooterComponent={
           <Pressable style={styles.newCircleButton} onPress={() => setModalVisible(true)}>
             <Text style={styles.newCircleText}>+ new circle</Text>
@@ -104,6 +133,44 @@ export function CirclesScreen() {
                 disabled={!name.trim() || isCreating}
               >
                 <Text style={styles.modalButtonPrimaryText}>{isCreating ? 'Creating…' : 'Create'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!inviteCircle} animationType="slide" transparent onRequestClose={closeInviteModal}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={typography.heading}>Invite to {inviteCircle?.name}</Text>
+            <Text style={styles.inviteHint}>
+              They need an Up to Chat account already. Ask them to sign up first, then invite their email.
+            </Text>
+            <TextInput
+              value={inviteEmail}
+              onChangeText={setInviteEmail}
+              placeholder="friend@example.com"
+              placeholderTextColor={colors.textMuted}
+              style={styles.input}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoFocus
+            />
+            {inviteError && <Text style={styles.inviteError}>{inviteError}</Text>}
+            <View style={styles.modalActions}>
+              <Pressable style={[styles.modalButton, styles.modalButtonGhost]} onPress={closeInviteModal}>
+                <Text style={styles.modalButtonGhostText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonPrimary,
+                  (!inviteEmail.trim() || isInviting) && styles.modalButtonDisabled,
+                ]}
+                onPress={handleInvite}
+                disabled={!inviteEmail.trim() || isInviting}
+              >
+                <Text style={styles.modalButtonPrimaryText}>{isInviting ? 'Inviting…' : 'Invite'}</Text>
               </Pressable>
             </View>
           </View>
@@ -160,6 +227,11 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 13,
   },
+  circleFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   avatarRow: {
     flexDirection: 'row',
   },
@@ -167,6 +239,18 @@ const styles = StyleSheet.create({
     marginLeft: -10,
     borderWidth: 2,
     borderColor: colors.surface,
+  },
+  inviteButton: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  inviteButtonText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
   },
   newCircleButton: {
     borderWidth: 1,
@@ -199,6 +283,16 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     color: colors.textPrimary,
     fontSize: 16,
+  },
+  inviteHint: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: -spacing.sm,
+  },
+  inviteError: {
+    color: colors.danger,
+    fontSize: 13,
   },
   modalActions: {
     flexDirection: 'row',
