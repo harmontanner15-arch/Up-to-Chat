@@ -8,6 +8,7 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { AlertsScreen } from '../screens/AlertsScreen';
 import { CirclesScreen } from '../screens/CirclesScreen';
 import { HomeScreen } from '../screens/HomeScreen';
+import { useAppStore } from '../state/AppStore';
 import { colors } from '../theme/theme';
 
 const Tab = createBottomTabNavigator();
@@ -44,6 +45,8 @@ function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
 }
 
 export function RootNavigator() {
+  const { liveAlertsCount } = useAppStore();
+
   return (
     <NavigationContainer theme={navTheme}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: colors.background }}>
@@ -87,6 +90,8 @@ export function RootNavigator() {
             tabBarIcon: ({ focused }) => (
               <TabIcon name={focused ? 'notifications' : 'notifications-outline'} focused={focused} />
             ),
+            tabBarBadge: liveAlertsCount > 0 ? liveAlertsCount : undefined,
+            tabBarBadgeStyle: { backgroundColor: colors.accent, color: '#0A0D0B' },
           }}
         />
       </Tab.Navigator>

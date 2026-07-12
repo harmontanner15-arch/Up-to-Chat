@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as api from '../data/api';
 import { getErrorMessage } from '../data/errors';
 import { AlertItem, Circle, UpToChatStatus } from '../data/types';
@@ -15,6 +16,7 @@ type AppState = {
   initials: string;
   circles: Circle[];
   alerts: AlertItem[];
+  liveAlertsCount: number;
   status: UpToChatStatus;
   isLoadingCircles: boolean;
   isLoadingAlerts: boolean;
@@ -52,6 +54,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedCircleIds, setSelectedCircleIds] = useState<string[]>([]);
+  const seenLiveAlertIdsRef = useRef<Set<string> | null>(null);
 
   const toggleCircleSelected = useCallback((circleId: string) => {
     setSelectedCircleIds((prev) =>
@@ -90,6 +93,15 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     setIsLoadingAlerts(true);
     try {
       const data = await api.fetchAlerts(userId);
+      const liveIds = new Set(data.filter((a) => a.isLive).map((a) => a.id));
+      const previouslySeen = seenLiveAlertIdsRef.current;
+      if (previouslySeen !== null) {
+        const hasNewLiveAlert = [...liveIds].some((id) => !previouslySeen.has(id));
+        if (hasNewLiveAlert) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        }
+      }
+      seenLiveAlertIdsRef.current = liveIds;
       setAlerts(data);
     } catch (e) {
       setError(getErrorMessage(e, 'Failed to load alerts'));
@@ -222,6 +234,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const liveAlertsCount = useMemo(() => alerts.filter((a) => a.isLive).length, [alerts]);
+
   const value = useMemo<AppState>(
     () => ({
       userId,
@@ -229,6 +243,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       initials,
       circles,
       alerts,
+      liveAlertsCount,
       status,
       isLoadingCircles,
       isLoadingAlerts,
@@ -248,6 +263,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       initials,
       circles,
       alerts,
+      liveAlertsCount,
       status,
       isLoadingCircles,
       isLoadingAlerts,
