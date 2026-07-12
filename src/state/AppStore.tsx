@@ -1,7 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as api from '../data/api';
 import { getErrorMessage } from '../data/errors';
-import { activityOptions } from '../data/options';
 import { AlertItem, Circle, UpToChatStatus } from '../data/types';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
@@ -21,13 +20,9 @@ type AppState = {
   isLoadingAlerts: boolean;
   error: string | null;
   clearError: () => void;
-  selectedDurationMinutes: number;
-  selectedActivityId: string;
   selectedCircleIds: string[];
   toggleCircleSelected: (circleId: string) => void;
-  setSelectedDuration: (minutes: number) => void;
-  setSelectedActivity: (activityId: string) => void;
-  goUpToChat: () => Promise<void>;
+  goUpToChat: (activity: string, durationMinutes: number) => Promise<void>;
   cancelUpToChat: () => Promise<void>;
   dismissAlert: (alertId: string) => Promise<void>;
   createCircle: (input: NewCircleInput) => Promise<void>;
@@ -56,8 +51,6 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedDurationMinutes, setSelectedDurationMinutes] = useState(15);
-  const [selectedActivityId, setSelectedActivityId] = useState(activityOptions[0].id);
   const [selectedCircleIds, setSelectedCircleIds] = useState<string[]>([]);
 
   const toggleCircleSelected = useCallback((circleId: string) => {
@@ -150,25 +143,27 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     };
   }, [userId, refreshAlerts, refreshCircles]);
 
-  const goUpToChat = useCallback(async () => {
-    if (!userId || selectedCircleIds.length === 0) return;
-    setError(null);
-    const activity = activityOptions.find((a) => a.id === selectedActivityId)?.label ?? 'Free time';
-    try {
-      const created = await api.goUpToChat(userId, activity, selectedDurationMinutes, selectedCircleIds);
-      setActiveStatusId(created.id);
-      setStatus({
-        isActive: true,
-        activity: created.activity,
-        durationMinutes: created.duration_minutes,
-        startedAt: new Date(created.started_at).getTime(),
-        circleIds: selectedCircleIds,
-      });
-      await refreshCircles();
-    } catch (e) {
-      setError(getErrorMessage(e, 'Failed to go up to chat'));
-    }
-  }, [userId, selectedActivityId, selectedDurationMinutes, selectedCircleIds, refreshCircles]);
+  const goUpToChat = useCallback(
+    async (activity: string, durationMinutes: number) => {
+      if (!userId || selectedCircleIds.length === 0) return;
+      setError(null);
+      try {
+        const created = await api.goUpToChat(userId, activity, durationMinutes, selectedCircleIds);
+        setActiveStatusId(created.id);
+        setStatus({
+          isActive: true,
+          activity: created.activity,
+          durationMinutes: created.duration_minutes,
+          startedAt: new Date(created.started_at).getTime(),
+          circleIds: selectedCircleIds,
+        });
+        await refreshCircles();
+      } catch (e) {
+        setError(getErrorMessage(e, 'Failed to go up to chat'));
+      }
+    },
+    [userId, selectedCircleIds, refreshCircles]
+  );
 
   const cancelUpToChat = useCallback(async () => {
     if (!activeStatusId) return;
@@ -239,12 +234,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       isLoadingAlerts,
       error,
       clearError: () => setError(null),
-      selectedDurationMinutes,
-      selectedActivityId,
       selectedCircleIds,
       toggleCircleSelected,
-      setSelectedDuration: setSelectedDurationMinutes,
-      setSelectedActivity: setSelectedActivityId,
       goUpToChat,
       cancelUpToChat,
       dismissAlert,
@@ -261,8 +252,6 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       isLoadingCircles,
       isLoadingAlerts,
       error,
-      selectedDurationMinutes,
-      selectedActivityId,
       selectedCircleIds,
       toggleCircleSelected,
       goUpToChat,

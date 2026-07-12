@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Avatar } from '../components/Avatar';
 import { Chip } from '../components/Chip';
-import { activityOptions, durationOptions } from '../data/options';
+import { CUSTOM_ACTIVITY_ID, activityOptions, durationOptions } from '../data/options';
 import { useAppStore } from '../state/AppStore';
 import { useAuth } from '../state/AuthContext';
 import { colors, radii, spacing, typography } from '../theme/theme';
+
+const MAX_CUSTOM_MINUTES = 1440;
 
 function greetingForHour(hour: number) {
   if (hour < 12) return 'Good morning';
@@ -21,24 +23,20 @@ function formatCountdown(ms: number) {
 }
 
 export function HomeScreen() {
-  const {
-    firstName,
-    initials,
-    circles,
-    status,
-    selectedDurationMinutes,
-    selectedActivityId,
-    selectedCircleIds,
-    toggleCircleSelected,
-    setSelectedDuration,
-    setSelectedActivity,
-    goUpToChat,
-    cancelUpToChat,
-  } = useAppStore();
+  const { firstName, initials, circles, status, selectedCircleIds, toggleCircleSelected, goUpToChat, cancelUpToChat } =
+    useAppStore();
   const { signOut } = useAuth();
 
   const [now, setNow] = useState(Date.now());
   const greeting = useMemo(() => greetingForHour(new Date().getHours()), []);
+
+  const [presetMinutes, setPresetMinutes] = useState(15);
+  const [isCustomDuration, setIsCustomDuration] = useState(false);
+  const [customDurationText, setCustomDurationText] = useState('');
+
+  const [presetActivityId, setPresetActivityId] = useState(activityOptions[0].id);
+  const [customActivityText, setCustomActivityText] = useState('');
+  const isCustomActivity = presetActivityId === CUSTOM_ACTIVITY_ID;
 
   useEffect(() => {
     if (circles.length > 0 && selectedCircleIds.length === 0) {
@@ -64,7 +62,26 @@ export function HomeScreen() {
     if (hasExpired) cancelUpToChat();
   }, [hasExpired, cancelUpToChat]);
 
-  const canGoActive = selectedCircleIds.length > 0;
+  const parsedCustomMinutes = parseInt(customDurationText, 10);
+  const isValidCustomDuration =
+    Number.isInteger(parsedCustomMinutes) && parsedCustomMinutes > 0 && parsedCustomMinutes <= MAX_CUSTOM_MINUTES;
+  const resolvedDurationMinutes = isCustomDuration ? (isValidCustomDuration ? parsedCustomMinutes : null) : presetMinutes;
+
+  const trimmedCustomActivity = customActivityText.trim();
+  const resolvedActivity = isCustomActivity
+    ? trimmedCustomActivity
+    : activityOptions.find((a) => a.id === presetActivityId)?.label ?? 'Free time';
+  const isValidActivity = isCustomActivity ? trimmedCustomActivity.length > 0 : true;
+
+  const canGoActive = selectedCircleIds.length > 0 && resolvedDurationMinutes !== null && isValidActivity;
+
+  const handlePress = () => {
+    if (status.isActive) {
+      cancelUpToChat();
+    } else if (canGoActive && resolvedDurationMinutes !== null) {
+      goUpToChat(resolvedActivity, resolvedDurationMinutes);
+    }
+  };
 
   return (
     <ScrollView
@@ -92,7 +109,7 @@ export function HomeScreen() {
       </View>
 
       <Pressable
-        onPress={status.isActive ? cancelUpToChat : canGoActive ? goUpToChat : undefined}
+        onPress={handlePress}
         style={({ pressed }) => [
           styles.toggleCard,
           status.isActive ? styles.toggleCardActive : styles.toggleCardIdle,
@@ -122,15 +139,29 @@ export function HomeScreen() {
             <Chip
               key={option.label}
               label={option.label}
-              selected={
-                option.minutes === 0
-                  ? ![15, 30, 60].includes(selectedDurationMinutes)
-                  : selectedDurationMinutes === option.minutes
-              }
-              onPress={() => setSelectedDuration(option.minutes === 0 ? 45 : option.minutes)}
+              selected={option.minutes === 0 ? isCustomDuration : !isCustomDuration && presetMinutes === option.minutes}
+              onPress={() => {
+                if (option.minutes === 0) {
+                  setIsCustomDuration(true);
+                } else {
+                  setIsCustomDuration(false);
+                  setPresetMinutes(option.minutes);
+                }
+              }}
             />
           ))}
         </View>
+        {isCustomDuration && (
+          <TextInput
+            value={customDurationText}
+            onChangeText={setCustomDurationText}
+            placeholder="Minutes, e.g. 90"
+            placeholderTextColor={colors.textMuted}
+            style={styles.customInput}
+            keyboardType="number-pad"
+            maxLength={4}
+          />
+        )}
       </View>
 
       <View style={styles.section}>
@@ -140,11 +171,21 @@ export function HomeScreen() {
             <Chip
               key={option.id}
               label={option.label}
-              selected={selectedActivityId === option.id}
-              onPress={() => setSelectedActivity(option.id)}
+              selected={presetActivityId === option.id}
+              onPress={() => setPresetActivityId(option.id)}
             />
           ))}
         </View>
+        {isCustomActivity && (
+          <TextInput
+            value={customActivityText}
+            onChangeText={setCustomActivityText}
+            placeholder="e.g. Driving to the airport"
+            placeholderTextColor={colors.textMuted}
+            style={styles.customInput}
+            maxLength={60}
+          />
+        )}
       </View>
 
       <View style={styles.section}>
@@ -255,5 +296,15 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
     marginTop: spacing.sm,
+  },
+  customInput: {
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.sm,
+    padding: spacing.md,
+    color: colors.textPrimary,
+    fontSize: 15,
+    backgroundColor: colors.surface,
   },
 });
