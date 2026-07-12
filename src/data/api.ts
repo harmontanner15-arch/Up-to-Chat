@@ -57,7 +57,7 @@ export async function fetchCircles(userId: string): Promise<Circle[]> {
 
   const { data: allMembers, error: allMembersErr } = await supabase
     .from('circle_members')
-    .select('circle_id, profiles(id, first_name, avatar_color)')
+    .select('circle_id, profiles!user_id(id, first_name, avatar_color)')
     .in('circle_id', circleIds);
   if (allMembersErr) throw allMembersErr;
 
@@ -207,7 +207,7 @@ export async function fetchAlerts(userId: string): Promise<AlertItem[]> {
   const { data, error } = await supabase
     .from('status_circles')
     .select(
-      'circle_id, availability_status!inner(id, user_id, activity, duration_minutes, started_at, ends_at, is_active, profiles(first_name, avatar_color))'
+      'circle_id, availability_status!inner(id, user_id, activity, duration_minutes, started_at, ends_at, is_active, profiles!user_id(first_name, avatar_color))'
     )
     .in('circle_id', circleIds)
     .neq('availability_status.user_id', userId);
